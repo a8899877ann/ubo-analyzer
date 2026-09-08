@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>UBO Analyzer v0.5.2</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","Segoe UI",sans-serif;background:#f5f6f8;color:#202124}
+.wrap{max-width:760px;margin:auto;padding:18px 14px 40px}
+h1{font-size:24px;margin:4px 0 5px}.sub{color:#666;font-size:14px;margin-bottom:18px}
+.card{background:#fff;border-radius:14px;padding:16px;margin:10px 0;box-shadow:0 1px 5px #00000010}
+label{display:block;font-size:13px;color:#666;margin:0 0 6px}
+input,select,button{font:inherit}
+input,select{width:100%;padding:11px 12px;border:1px solid #d7d9dd;border-radius:9px;background:#fff}
+.row{display:grid;grid-template-columns:minmax(0,1fr) 105px 82px 40px;gap:7px;align-items:end;margin:9px 0}
+.row button{height:43px;border:0;background:#f0f1f3;border-radius:9px}
+.btn{border:0;border-radius:10px;padding:11px 14px;cursor:pointer}
+.add{background:#eef3ff;color:#2456b8;width:100%;margin-top:6px}
+.primary{background:#202124;color:white;width:100%;font-weight:600;margin-top:12px}
+.secondary{background:#eef0f2;width:100%;margin-top:9px}
+.error{color:#b42318;font-size:13px;margin-top:8px}
+.status{margin:12px 0;padding:12px;border-radius:10px;background:#f7f7f8;font-size:14px}
+.status.done{background:#eaf7ed;color:#176b2c}
+.status.need{background:#fff7e6;color:#7a4d00}
+.branch{margin:12px 0 0 0;border-left:3px solid #d9dde3;padding-left:12px}
+.branch-title{font-weight:700;font-size:15px;margin-bottom:7px}
+.child{margin:10px 0 0 8px;padding:12px;background:#fafafa;border-radius:11px;border:1px solid #eceef1}
+.child .row{grid-template-columns:minmax(0,1fr) 105px 82px 40px}
+.badge{display:inline-block;font-size:12px;padding:4px 8px;border-radius:999px;background:#dff3e2;color:#176b2c;white-space:nowrap}
+.need-badge{background:#fff0c9;color:#7a4d00}
+.stop{color:#777;font-size:12px}
+.lock{color:#176b2c;font-size:12px}
+.ubo{display:flex;justify-content:space-between;gap:10px;padding:12px;border-radius:10px;margin:8px 0;background:#f6faf6}
+.ubo strong{font-size:16px}.muted{color:#777;font-size:13px}
+.calc{font-size:13px;line-height:1.6;background:#f7f7f8;padding:10px;border-radius:9px;margin-top:7px;word-break:break-word}
+.tree{font-size:14px;line-height:1.8;overflow:auto}
+.node{border-left:2px solid #ddd;padding-left:10px;margin:3px 0}
+.warn{background:#fff7e6;padding:10px;border-radius:9px;color:#7a4d00;font-size:13px;margin-top:8px}
+.small{font-size:12px;color:#777;margin-top:12px;line-height:1.5}
+
+.level-tools{margin:8px 0 8px;padding:10px;border:1px solid #eceef1;border-radius:10px;background:#fafafa}.mode-title{font-size:12px;color:#777;margin-bottom:6px}.mode-buttons{display:grid;grid-template-columns:1fr 1fr;gap:7px}.mode-btn{border:1px solid #d7d9dd;background:#fff;border-radius:8px;padding:9px}.mode-btn.active{background:#eef3ff;border-color:#9eb8ee;color:#2456b8;font-weight:600}.total-shares{margin-top:8px}.level-total{margin:8px 0 10px;padding:9px 11px;border-radius:9px;font-size:13px;font-weight:600}.level-total.neutral{background:#f0f1f3;color:#666}.level-total.good{background:#eaf7ed;color:#176b2c}.level-total.bad{background:#fdecec;color:#b42318}.value-wrap{min-width:0}.converted{font-size:11px;color:#666;margin-top:3px;padding-left:2px}.row .value-wrap input{margin:0}
+.estimate-box{background:#f7f7f8;border:1px dashed #cfd3d8;padding:10px;border-radius:9px;margin-top:8px;font-size:13px;line-height:1.5}.estimate-safe{background:#eaf7ed;color:#176b2c;border-style:solid}.estimate-need{background:#fff7e6;color:#7a4d00;border-style:solid}.estimate-btn{background:#f0f1f3;width:100%;margin-top:8px}.hidden{display:none!important}
+@media(max-width:520px){
+ .row{grid-template-columns:minmax(0,1fr) 90px 70px 38px}
+ .row input,.row select{padding:10px 8px}
+ .child .row{grid-template-columns:minmax(0,1fr) 90px 70px 38px}
+}
+@media print{
+ body{background:#fff}.wrap{max-width:none;padding:0}
+ .card{box-shadow:none;border:1px solid #ddd;break-inside:avoid}
+ #inputArea,.no-print{display:none!important}
+ .result{display:block!important}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>UBO Analyzer</h1>
+<div class="sub">v0.5.2 · 25% 實質受益人快速判斷</div>
+
+<div id="inputArea">
+  <div class="card">
+    <label>目標公司</label>
+    <input id="company" placeholder="例如：ABC Limited">
+  </div>
+
+  <div class="card">
+    <label>第一層股東</label>
+    <div id="rootRows"></div>
+    <button class="btn add" onclick="addRootRow()">＋ 新增股東</button>
+    <button class="btn primary" onclick="startAnalysis()">開始分析</button>
+    <div id="error" class="error"></div>
+  </div>
+</div>
+
+<div id="workflow" class="card hidden">
+  <div id="workflowStatus" class="status"></div>
+  <div id="branches"></div>
+</div>
+
+<div id="result" class="hidden">
+  <div class="card">
+    <h2 style="font-size:19px;margin:0 0 10px">UBO 結果</h2>
+    <div id="uboList"></div>
+    <div id="noUbo" class="muted hidden">目前沒有自然人達到 25%。</div>
+  </div>
+  <div class="card">
+    <h2 style="font-size:19px;margin:0 0 10px">計算明細</h2>
+    <div id="details"></div>
+  </div>
+  <div class="card">
+    <h2 style="font-size:19px;margin:0 0 10px">股權結構</h2>
+    <div id="tree" class="tree"></div>
+  </div>
+  <div class="card no-print">
+    <button class="btn secondary" onclick="window.print()">列印 / 儲存為 PDF</button>
+    <div class="small">所有計算都在目前頁面完成；手機可選「列印」→「儲存為 PDF」。</div>
+  </div>
+</div>
+</div>
+
+<script>
+const TH=0.25, EPS=1e-10;
+let rootRows=[newRow()];
+let rootLevel={mode:"percent",totalShares:""};
+let companyNodes={};
+let people={};
+let blocked=new Set();
+let target="";
+
+function uid(){return "r"+Math.random().toString(36).slice(2,10)}
+function newRow(){return {id:uid(),name:"",type:"person",pct:"",shares:""}}
+function esc(s){return String(s??"").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
+function fmt(n){let x=Math.round(n*10000)/100;return (Number.isInteger(x)?x.toFixed(0):x.toFixed(2))+"%"}
+function valPct(x){return Number(x)/100}
+
+function levelTotal(level,rows){
+ if(level.mode==="shares"){
+   const total=Number(level.totalShares);
+   if(!(total>0)) return null;
+   return rows.reduce((s,r)=>s+(Number(r.shares)||0),0)/total;
+ }
+ return rows.reduce((s,r)=>s+(Number(r.pct)||0),0)/100;
+}
+function rowPct(row,level){
+ if(level.mode==="shares"){
+   const total=Number(level.totalShares);
+   if(!(total>0)||row.shares==="")return null;
+   return Number(row.shares)/total;
+ }
+ return row.pct===""?null:Number(row.pct)/100;
+}
+function totalClass(total){
+ if(total===null)return "level-total neutral";
+ if(Math.abs(total-1)<0.000001)return "level-total good";
+ if(total>1)return "level-total bad";
+ return "level-total neutral";
+}
+function levelTotalText(level,rows){
+ const total=levelTotal(level,rows);
+ if(total===null)return "本層股權：尚未設定總股數";
+ return `本層股權合計：${fmt(total)}${Math.abs(total-1)<0.000001?" ✓ 已達100%":""}`;
+}
+function updateLevelIndicator(id,level,rows){
+ const el=document.getElementById(id); if(!el)return;
+ const total=levelTotal(level,rows);
+ el.className=totalClass(total);
+ el.textContent=levelTotalText(level,rows);
+}
+function refreshShareInputs(level,key){
+ const total=Number(level.totalShares);
+ const enabled=level.mode!=="shares" || total>0;
+ document.querySelectorAll(`[data-share-level="${key}"]`).forEach(el=>{
+   el.disabled=!enabled;
+   el.removeAttribute("aria-disabled");
+ });
+}
+function refreshConvertedRow(rowId,level){
+ const el=document.querySelector(`[data-converted-for="${rowId}"]`);
+ if(!el)return;
+ const converted=rowPct(level._rowsById?.[rowId]||{},level);
+ el.textContent=converted===null?"":`= ${fmt(converted)}`;
+}
+
+function validateLevel(level,rows){
+ if(!rows.length)return "請至少新增一名股東。";
+ if(level.mode==="shares" && !(Number(level.totalShares)>0))return "使用股數輸入時，請先輸入總股數。";
+ for(const r of rows){
+   if(!r.name.trim())return "請填寫每一位股東名稱。";
+   if(level.mode==="percent"){
+     if(r.pct===""||Number(r.pct)<0||Number(r.pct)>100)return "請確認所有持股比例介於 0–100%。";
+   }else{
+     if(r.shares===""||Number(r.shares)<0||Number(r.shares)>Number(level.totalShares))return "請確認所有股數。";
+   }
+ }
+ const total=levelTotal(level,rows);
+ if(total>1+0.000001)return "本層股權合計超過 100%，請檢查輸入。";
+ return "";
+}
+
+function addRootRow(){rootRows.push(newRow());renderRoot()}
+function removeRootRow(i){rootRows.splice(i,1);renderRoot()}
+function setRootMode(mode){
+ rootLevel.mode=mode;
+ if(mode==="shares"){
+   rootRows.forEach(r=>{if(r.shares==="" && r.pct!=="")r.shares="";});
+ }
+ renderRoot();
+}
+function updateRoot(i,k,v){
+ if(k==="TYPE")rootRows[i].type=v; else rootRows[i][k]=v;
+ updateLevelIndicator("rootTotal",rootLevel,rootRows);
+ if(k==="shares"||k==="pct")refreshConvertedRow(rootRows[i].id,rootLevel);
+}
+function updateRootTotal(v){
+ rootLevel.totalShares=v;
+ updateLevelIndicator("rootTotal",rootLevel,rootRows);
+ refreshShareInputs(rootLevel,"root");
+ rootRows.forEach(r=>refreshConvertedRow(r.id,rootLevel));
+}
+
+function makeRow(r,i,kind,nodeId,level){
+ const d=document.createElement("div");d.className="row";
+ const nameChange=kind==="root"?`updateRoot(${i},'name',this.value)`:`updateChild('${nodeId}',${i},'name',this.value)`;
+ const typeChange=kind==="root"?`updateRoot(${i},'TYPE',this.value)`:`updateChild('${nodeId}',${i},'TYPE',this.value)`;
+ const valueChange=kind==="root"?`updateRoot(${i},'${level.mode==="shares"?"shares":"pct"}',this.value)`:`updateChild('${nodeId}',${i},'${level.mode==="shares"?"shares":"pct"}',this.value)`;
+ const remove=kind==="root"?`removeRootRow(${i})`:`removeChild('${nodeId}',${i})`;
+ let valueHtml;
+ if(level.mode==="shares"){
+   const converted=rowPct(r,level);
+   const levelKey=kind==="root"?"root":nodeId;
+   const disabled=!(Number(level.totalShares)>0);
+   valueHtml=`<input data-share-level="${levelKey}" type="number" min="0" step="0.01" inputmode="decimal" placeholder="股數" value="${esc(r.shares)}" ${disabled?"disabled":""} oninput="${valueChange}">`;
+   valueHtml+=`<div class="converted" data-converted-for="${r.id}">${converted!==null?`= ${fmt(converted)}`:""}</div>`;
+ }
+ else{
+   valueHtml=`<input type="number" min="0" max="100" step="0.01" inputmode="decimal" placeholder="%" value="${esc(r.pct)}" oninput="${valueChange}">`;
+ }
+ d.innerHTML=`<input placeholder="名稱" value="${esc(r.name)}" oninput="${nameChange}">
+ <select onchange="${typeChange}">
+  <option value="person" ${r.type==="person"?"selected":""}>自然人</option>
+  <option value="company" ${r.type==="company"?"selected":""}>公司</option>
+ </select>
+ <div class="value-wrap">${valueHtml}</div>
+ <button onclick="${remove}">×</button>`;
+ return d;
+}
+
+function renderLevelHeader(container,level,rows,indicatorId,setModeFn,totalFn){
+ level._rowsById={}; rows.forEach(r=>level._rowsById[r.id]=r);
+ const tools=document.createElement("div");tools.className="level-tools";
+ tools.innerHTML=`<div class="mode-title">輸入方式</div>
+ <div class="mode-buttons">
+   <button class="mode-btn ${level.mode==="percent"?"active":""}" onclick="${setModeFn}('percent')">%</button>
+   <button class="mode-btn ${level.mode==="shares"?"active":""}" onclick="${setModeFn}('shares')">股數</button>
+ </div>`;
+ if(level.mode==="shares"){
+   const total=document.createElement("input");total.className="total-shares";total.type="number";total.min="0";total.step="1";total.inputMode="numeric";total.placeholder="請先輸入總股數";total.value=level.totalShares;
+   total.oninput=()=>{
+   totalFn(total.value);
+   const enabled=Number(total.value)>0;
+   const key=setModeFn.includes("Root")?"root":container.dataset.nodeId;
+   if(key) refreshShareInputs(level,key);
+ };tools.appendChild(total);
+ }
+ container.appendChild(tools);
+ const ind=document.createElement("div");ind.id=indicatorId;ind.className=totalClass(levelTotal(level,rows));ind.textContent=levelTotalText(level,rows);container.appendChild(ind);
+}
+
+function renderRoot(){
+ const box=document.getElementById("rootRows");box.innerHTML="";
+ renderLevelHeader(box,rootLevel,rootRows,"rootTotal","setRootMode","updateRootTotal");
+ rootRows.forEach((r,i)=>box.appendChild(makeRow(r,i,"root",null,rootLevel)));
+}
+
+function startAnalysis(){
+ const err=document.getElementById("error");err.textContent="";
+ const msg=validateLevel(rootLevel,rootRows);if(msg){err.textContent=msg;return}
+ target=(document.getElementById("company").value||"").trim()||"目標公司";
+ people={};blocked=new Set();companyNodes={};
+ rootRows.forEach(r=>{
+   const c=rowPct(r,rootLevel); if(c===null)return;
+   const name=r.name.trim();
+   if(r.type==="person")addPerson(name,c,target+" → "+name);
+ });
+ rootRows.forEach(r=>{
+   const c=rowPct(r,rootLevel); if(c===null||r.type!=="company")return;
+   const name=r.name.trim(),must=maxCanReach(c),id=makeId();
+   companyNodes[id]={id,name,rowId:r.id,pct:c,multiplier:c,path:[target,name],rows:null,level:{mode:"percent",totalShares:""},done:!must,must,parentId:null};
+ });
+ document.getElementById("workflow").classList.remove("hidden");
+ document.getElementById("result").classList.add("hidden");
+ renderWorkflow();
+ window.scrollTo({top:document.getElementById("workflow").offsetTop-10,behavior:"smooth"});
+}
+
+function addPerson(name,contribution,path){
+ name=name.trim();if(!name)return;
+ // 「blocked」只代表後續不必再追蹤此人的分支，
+ // 不代表已知的持股貢獻不應計入最終總持股。
+ // 因此即使此人已達25%，後續已經輸入的路徑仍要繼續累加。
+ if(!people[name])people[name]={total:0,paths:[]};
+ people[name].total+=contribution;
+ people[name].paths.push({value:contribution,path});
+ if(people[name].total>=TH-EPS)blocked.add(name);
+}
+function maxCanReach(contribution){
+ if(contribution>=TH-EPS)return true;
+ return Object.keys(people).some(n=>!blocked.has(n)&&people[n].total+contribution>=TH-EPS);
+}
+function makeId(){return"c"+Math.random().toString(36).slice(2,10)}
+
+function updateChild(nodeId,i,k,v){
+ const node=companyNodes[nodeId];if(!node||!node.rows)return;
+ if(k==="TYPE")node.rows[i].type=v;else node.rows[i][k]=v;
+ updateLevelIndicator("total_"+nodeId,node.level,node.rows);
+ if(k==="shares"||k==="pct")refreshConvertedRow(node.rows[i].id,node.level);
+}
+function updateChildTotal(nodeId,v){
+ const node=companyNodes[nodeId];if(!node)return;
+ node.level.totalShares=v;
+ updateLevelIndicator("total_"+nodeId,node.level,node.rows||[]);
+ refreshShareInputs(node.level,nodeId);
+ node.rows.forEach(r=>refreshConvertedRow(r.id,node.level));
+}
+function setChildMode(nodeId,mode){
+ const node=companyNodes[nodeId];if(!node)return;
+ node.level.mode=mode;
+ if(mode==="shares")node.rows.forEach(r=>{if(r.shares==="")r.shares="";});
+ renderWorkflow();
+}
+function addChild(nodeId){const node=companyNodes[nodeId];node.rows.push(newRow());renderWorkflow()}
+function removeChild(nodeId,i){const node=companyNodes[nodeId];node.rows.splice(i,1);renderWorkflow()}
+
+function estimateUnknown(nodeId){
+ const node=companyNodes[nodeId];if(!node)return;
+ recomputeAll();
+ const possible=[];
+ Object.entries(people).forEach(([name,v])=>{
+   if(!blocked.has(name) && v.total+node.multiplier>=TH-EPS) possible.push({name,total:v.total});
+ });
+ if(node.multiplier>=TH-EPS || possible.length){
+   node.estimated=true;node.estimatedSafe=false;node.estimatePeople=possible;
+ }else{
+   node.estimated=true;node.estimatedSafe=true;node.estimatePeople=[];node.must=false;node.done=true;node.rows=null;
+ }
+ renderWorkflow();
+}
+
+function submitChild(nodeId){
+ const node=companyNodes[nodeId];
+ const msg=validateLevel(node.level,node.rows);
+ if(msg){node.error=msg;renderWorkflow();return}
+ node.error="";node.done=true;recomputeAll();renderWorkflow();
+ // 完成一層後，不再跳回最上方；優先前往目前分支的下一層。
+ setTimeout(()=>{
+  const next=Object.values(companyNodes).find(n=>n.parentId===node.id&&n.must&&(!n.rows||!n.done))
+   || Object.values(companyNodes).find(n=>n.must&&(!n.rows||!n.done));
+  if(next){
+   const el=document.querySelector(`[data-node-id="${next.id}"]`);
+   if(el)el.scrollIntoView({behavior:"smooth",block:"center"});
+  }
+ },50);
+}
+
+function recomputeAll(){
+ people={};blocked=new Set();
+ rootRows.forEach(r=>{
+   const c=rowPct(r,rootLevel);if(c===null)return;
+   const name=r.name.trim();if(name&&r.type==="person")addPerson(name,c,target+" → "+name);
+ });
+ const processed=new Set();let changed=true;
+ while(changed){
+   changed=false;
+   const list=Object.values(companyNodes).filter(n=>n.rows&&n.done&&!processed.has(n.id));
+   for(const node of list){
+     processed.add(node.id);changed=true;
+     node.rows.forEach(r=>{
+       const local=rowPct(r,node.level);if(local===null)return;
+       const name=r.name.trim();if(!name)return;
+       const c=node.multiplier*local,path=node.path.concat([name]).join(" → ");
+       if(r.type==="person")addPerson(name,c,path);
+       else{
+         let child=Object.values(companyNodes).find(x=>x.parentId===node.id&&x.rowId===r.id);
+         if(!child){
+           const must=maxCanReach(c),id=makeId();
+           child={id,name,rowId:r.id,pct:local,multiplier:c,path:node.path.concat([name]),rows:null,level:{mode:"percent",totalShares:""},done:!must,must,parentId:node.id};
+           companyNodes[id]=child;
+         }else{
+           child.name=name;child.pct=local;child.multiplier=c;child.path=node.path.concat([name]);
+         }
+       }
+     });
+   }
+ }
+ Object.values(companyNodes).forEach(n=>{
+   if(n.rows&&!n.done)n.must=maxCanReach(n.multiplier);
+   if(!n.rows){n.must=maxCanReach(n.multiplier);if(!n.must)n.done=true;}
+ });
+}
+
+function renderWorkflow(){
+ recomputeAll();
+ const nodes=Object.values(companyNodes);
+ const needs=nodes.filter(n=>n.must&&(!n.rows||!n.done));
+ const status=document.getElementById("workflowStatus");
+ const branches=document.getElementById("branches");branches.innerHTML="";
+ if(needs.length){status.className="status need";status.innerHTML=`<strong>還需要輸入 ${needs.length} 個公司分支</strong><br>每個需要追蹤的公司都會直接在下面展開下一層。`}
+ else{status.className="status done";status.innerHTML="<strong>✓ 分析完成</strong><br>所有需要追蹤的公司都已完成，可以查看 UBO 結果。"}
+ nodes.filter(n=>!n.parentId).forEach(n=>renderBranch(n,branches,0));
+ if(!needs.length)renderResult();else document.getElementById("result").classList.add("hidden");
+}
+
+function renderBranch(node,container,depth){
+ const wrap=document.createElement("div");wrap.className="branch";
+ const title=document.createElement("div");title.className="branch-title";
+ const status=node.estimatedSafe?"<span class='badge'>推估可停止</span>":(node.done?"<span class='badge'>已完成</span>":(node.must?"<span class='badge need-badge'>必須繼續輸入</span>":"<span class='stop'>無需繼續往下追</span>"));
+ title.innerHTML=`🏢 ${esc(node.name)} · 目標公司有效持股 ${fmt(node.multiplier)} ${status}`;wrap.appendChild(title);
+ if(!node.must){
+   const p=document.createElement("div");p.className="stop";
+   p.textContent=node.estimatedSafe?"資料未取得；已用最保守推估：假設同一自然人持有此公司 100%，仍無法達到 25%，因此無需繼續往下追。":"即使此公司 100% 由同一自然人持有，也無法使其達到 25%，因此停止追蹤。";
+   wrap.appendChild(p);container.appendChild(wrap);return;
+ }
+ if(!node.rows)node.rows=[newRow()];
+ const estimate=document.createElement("div");estimate.className="estimate-box";
+ estimate.innerHTML="資料取得不到這間公司時，可以先做「最保守推估」：假設此公司 100% 都由同一自然人持有。若仍不可能達到 25%，就可以停止追蹤；若有可能，則不能單靠推估排除。";
+ const eb=document.createElement("button");eb.className="btn estimate-btn";eb.textContent="資料拿不到 → 做最保守推估";eb.onclick=()=>estimateUnknown(node.id);estimate.appendChild(eb);
+ if(node.estimated&&!node.estimatedSafe){
+   estimate.className="estimate-box estimate-need";
+   estimate.innerHTML="推估結果：仍可能有自然人達到 25%，因此不能安全停止追蹤。";
+   if(node.estimatePeople?.length) estimate.innerHTML+=`<br>可能受影響的已知自然人：${node.estimatePeople.map(x=>esc(x.name)+"（目前 "+fmt(x.total)+"）").join("、")}`;
+ }
+ wrap.appendChild(estimate);
+ const child=document.createElement("div");child.className="child";child.dataset.nodeId=node.id;
+ const label=document.createElement("label");label.textContent="請直接輸入「"+node.name+"」的下一層股東";child.appendChild(label);
+ renderLevelHeader(child,node.level,node.rows,"total_"+node.id,`setChildMode('${node.id}',this.value)`,`updateChildTotal('${node.id}',this.value)`);
+ const rowsBox=document.createElement("div");node.rows.forEach((r,i)=>rowsBox.appendChild(makeRow(r,i,"child",node.id,node.level)));child.appendChild(rowsBox);
+ const add=document.createElement("button");add.className="btn add";add.textContent="＋ 新增股東";add.onclick=()=>addChild(node.id);child.appendChild(add);
+ const submit=document.createElement("button");submit.className="btn primary";submit.textContent="完成這一層並繼續判斷";submit.onclick=()=>submitChild(node.id);child.appendChild(submit);
+ if(node.error){const e=document.createElement("div");e.className="error";e.textContent=node.error;child.appendChild(e)}
+ wrap.appendChild(child);
+ const nested=document.createElement("div");Object.values(companyNodes).filter(x=>x.parentId===node.id).forEach(x=>renderBranch(x,nested,depth+1));wrap.appendChild(nested);container.appendChild(wrap);
+}
+
+function renderResult(){
+ const list=document.getElementById("uboList");list.innerHTML="";
+ const sorted=Object.entries(people).sort((a,b)=>b[1].total-a[1].total),ubo=sorted.filter(x=>x[1].total>=TH-EPS);
+ document.getElementById("noUbo").classList.toggle("hidden",ubo.length>0);
+ ubo.forEach(([name,v])=>list.innerHTML+=`<div class="ubo"><div><strong>${esc(name)}</strong><div class="muted">已達 25%，後續路徑不再需要追蹤</div></div><span class="badge">${fmt(v.total)} · UBO</span></div>`);
+ const det=document.getElementById("details");det.innerHTML="";
+ sorted.forEach(([name,v])=>{det.innerHTML+=`<div style="margin-bottom:14px"><strong>${esc(name)}：${fmt(v.total)}</strong>${v.paths.map(x=>`<div class="calc">${esc(x.path)} = ${fmt(x.value)}</div>`).join("")}</div>`});
+ const tree=document.getElementById("tree");tree.innerHTML=`<div><strong>${esc(target)}</strong></div>`;rootRows.forEach(r=>renderTreeRow(r,tree,1,target));document.getElementById("result").classList.remove("hidden");
+}
+function renderTreeRow(r,container,depth,parentPath){
+ const d=document.createElement("div");d.className="node";d.style.marginLeft=(depth*12)+"px";
+ if(r.type==="person"){const total=people[r.name]?.total||0;d.innerHTML=`👤 ${esc(r.name)} — ${fmt(rowPct(r,rootLevel)||0)}${total>=TH-EPS?" <span class='badge'>已達25%，停止追蹤</span>":""}`}
+ else{const path=parentPath+" → "+r.name,node=Object.values(companyNodes).find(n=>n.path.join(" → ")===path);d.innerHTML=node?`🏢 ${esc(r.name)} — ${fmt(rowPct(r,rootLevel)||0)} ${node.must?(node.done?"<span class='badge'>已完成</span>":"<span class='badge need-badge'>必須繼續輸入</span>"):"<span class='stop'>↳ 無需繼續往下追</span>"}`:`🏢 ${esc(r.name)} — ${fmt(rowPct(r,rootLevel)||0)}`}
+ container.appendChild(d);
+ if(r.type==="company"){const path=parentPath+" → "+r.name,node=Object.values(companyNodes).find(n=>n.path.join(" → ")===path);if(node?.rows)node.rows.forEach(x=>renderTreeRow(x,container,depth+1,path));}
+}
+renderRoot();
+</script>
+</body>
+</html>
